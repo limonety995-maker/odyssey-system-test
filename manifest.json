@@ -1,15 +1,15 @@
 {
   "name": "Odyssey System",
-  "version": "1.2",
+  "version": "1.2.1",
   "manifest_version": 1,
   "description": "OS",
   "author": "Codex",
-  "icon": "https://VVinged1.github.io/Odyssey-system/icon.svg",
-  "background_url": "https://VVinged1.github.io/Odyssey-system/background.html",
+  "icon": "https://limonety995-maker.github.io/odyssey-system-test/icon.svg",
+  "background_url": "https://limonety995-maker.github.io/odyssey-system-test/background.html?v=1.2.1",
   "action": {
     "title": "Odyssey System",
-    "icon": "https://VVinged1.github.io/Odyssey-system/icon.svg",
-    "popover": "https://VVinged1.github.io/Odyssey-system/index.html",
+    "icon": "https://limonety995-maker.github.io/odyssey-system-test/icon.svg",
+    "popover": "https://limonety995-maker.github.io/odyssey-system-test/index.html?v=1.2.1",
     "height": 860,
     "width": 560
   }
