@@ -1,0 +1,16 @@
+{
+  "name": "Odyssey System",
+  "version": "1.2",
+  "manifest_version": 1,
+  "description": "OS",
+  "author": "Codex",
+  "icon": "https://VVinged1.github.io/Odyssey-system/icon.svg",
+  "background_url": "https://VVinged1.github.io/Odyssey-system/background.html",
+  "action": {
+    "title": "Odyssey System",
+    "icon": "https://VVinged1.github.io/Odyssey-system/icon.svg",
+    "popover": "https://VVinged1.github.io/Odyssey-system/index.html",
+    "height": 860,
+    "width": 560
+  }
+}

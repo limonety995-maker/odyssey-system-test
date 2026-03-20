@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Odyssey Combat Console</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">Odyssey Combat Console</h1>
+          <p id="pageSubtitle" class="sub">
+            Select an attacker token, choose a target token, and resolve combat here.
+          </p>
+        </div>
+        <div id="roleBadge" class="role-badge">...</div>
+      </header>
+
+      <section class="panel actions-panel">
+        <div class="row row-gap">
+          <button id="refreshBtn" type="button">Refresh</button>
+          <button id="syncBtn" type="button" data-view-scope="main">Rebuild Overlays</button>
+          <button id="combatLogBtn" type="button" class="secondary" data-view-scope="main">
+            Combat Log
+          </button>
+          <button id="closeCombatLogBtn" type="button" class="secondary" data-view-scope="combat-log">
+            Close Log
+          </button>
+        </div>
+        <p id="statusBox" class="status info">Loading extension...</p>
+      </section>
+
+      <section class="panel" data-view-scope="main">
+        <div class="section-head">
+          <div class="section-title">Selected Character</div>
+          <div id="selectionHint" class="muted">Nothing selected</div>
+        </div>
+        <div id="selectedTokenPanel"></div>
+      </section>
+
+      <section class="panel" data-view-scope="combat-log">
+        <details class="collapsible-block" data-section-key="global:debug-console" open>
+          <summary class="collapsible-title">Debug Console</summary>
+          <div class="collapsible-body">
+            <div class="muted">Last rolls and full combat tables</div>
+            <div id="debugConsole"></div>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel" id="trackedSection" data-view-scope="main">
+        <div class="section-head">
+          <div class="section-title">Tracked Characters</div>
+          <div id="trackedCount" class="muted">0</div>
+        </div>
+        <div id="trackedList" class="list"></div>
+      </section>
+
+      <section class="panel" id="allTokensSection" data-view-scope="main">
+        <div class="section-head">
+          <div class="section-title">All Character Tokens</div>
+          <div id="allCount" class="muted">0</div>
+        </div>
+        <div id="allTokensList" class="list"></div>
+      </section>
+    </div>
+
+    <script type="module" src="./assets/main.js?v=1.2"></script>
+  </body>
+</html>
