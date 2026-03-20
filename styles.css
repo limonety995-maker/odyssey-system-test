@@ -50,6 +50,21 @@ body.view-combat-log .topbar {
   align-items: center;
 }
 
+body.view-combat-log #pageHeader {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+body.view-combat-log.combat-log-dragging #pageHeader {
+  cursor: grabbing;
+}
+
+body.view-combat-log #pageTitle,
+body.view-combat-log #pageSubtitle {
+  pointer-events: none;
+}
+
 #app {
   padding: 16px;
   display: flex;

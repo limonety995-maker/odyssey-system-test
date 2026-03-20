@@ -4277,7 +4277,14 @@ function buildAttackSummary({ part, outcome, damage, attackRoll, attackTotal, de
 // main.js
 var DEBUG_LOG_KEY = "com.codex.body-hp/debugLog";
 var DEBUG_BROADCAST_CHANNEL = "com.codex.body-hp/debug";
-var COMBAT_LOG_MODAL_ID = `${EXTENSION_ID}/combat-log`;
+var COMBAT_LOG_POPOVER_ID = `${EXTENSION_ID}/combat-log`;
+var COMBAT_LOG_POSITION_KEY = `${COMBAT_LOG_POPOVER_ID}/position`;
+var COMBAT_LOG_WIDTH = 760;
+var COMBAT_LOG_HEIGHT = 720;
+var DEFAULT_COMBAT_LOG_POSITION = {
+  left: 32,
+  top: 96
+};
 var CORE_COMBAT_SKILLS = Object.keys(DEFAULT_ODYSSEY_SKILLS);
 var ATTACK_ONLY_EXCLUDED_SKILLS = /* @__PURE__ */ new Set([PARRY_SKILL_NAME]);
 var PAGE_VIEW = new URLSearchParams(window.location.search).get("view") === "combat-log" ? "combat-log" : "main";
@@ -4294,6 +4301,7 @@ var ATTRIBUTE_UI_FIELDS = [
   ["Magic", "Magic"]
 ];
 var ui = {
+  pageHeader: document.getElementById("pageHeader"),
   pageTitle: document.getElementById("pageTitle"),
   pageSubtitle: document.getElementById("pageSubtitle"),
   roleBadge: document.getElementById("roleBadge"),
@@ -4325,10 +4333,65 @@ var collapsibleSectionState = /* @__PURE__ */ new Map();
 var attackFormDrafts = /* @__PURE__ */ new Map();
 var inputAutosaveTimers = /* @__PURE__ */ new Map();
 var selectionPollTimer = null;
+var combatLogDragState = null;
+var combatLogMoveTimer = null;
+var combatLogMovePendingPosition = null;
+var combatLogPosition = null;
 function getViewUrl(view) {
   const url = new URL(window.location.href);
   url.searchParams.set("view", view);
   return url.toString();
+}
+function normalizeCombatLogPosition(raw) {
+  return {
+    left: Math.max(0, Math.round(Number(raw?.left) || DEFAULT_COMBAT_LOG_POSITION.left)),
+    top: Math.max(0, Math.round(Number(raw?.top) || DEFAULT_COMBAT_LOG_POSITION.top))
+  };
+}
+function getCombatLogPosition() {
+  if (combatLogPosition) {
+    return { ...combatLogPosition };
+  }
+  try {
+    const raw = window.localStorage.getItem(COMBAT_LOG_POSITION_KEY);
+    if (raw) {
+      combatLogPosition = normalizeCombatLogPosition(JSON.parse(raw));
+      return { ...combatLogPosition };
+    }
+  } catch (error) {
+    console.warn("[Body HP] Unable to read combat log position", error);
+  }
+  combatLogPosition = { ...DEFAULT_COMBAT_LOG_POSITION };
+  return { ...combatLogPosition };
+}
+function saveCombatLogPosition(position) {
+  combatLogPosition = normalizeCombatLogPosition(position);
+  try {
+    window.localStorage.setItem(COMBAT_LOG_POSITION_KEY, JSON.stringify(combatLogPosition));
+  } catch (error) {
+    console.warn("[Body HP] Unable to persist combat log position", error);
+  }
+  return { ...combatLogPosition };
+}
+function buildCombatLogPopoverOptions(position) {
+  return {
+    id: COMBAT_LOG_POPOVER_ID,
+    url: getViewUrl("combat-log"),
+    width: COMBAT_LOG_WIDTH,
+    height: COMBAT_LOG_HEIGHT,
+    anchorReference: "POSITION",
+    anchorPosition: saveCombatLogPosition(position),
+    anchorOrigin: {
+      vertical: "TOP",
+      horizontal: "LEFT"
+    },
+    transformOrigin: {
+      vertical: "TOP",
+      horizontal: "LEFT"
+    },
+    marginThreshold: 12,
+    disableClickAway: true
+  };
 }
 function applyPageView() {
   document.body.classList.toggle("view-main", !IS_COMBAT_LOG_VIEW);
@@ -4338,19 +4401,71 @@ function applyPageView() {
     ui.pageTitle.textContent = IS_COMBAT_LOG_VIEW ? "Odyssey Combat Log" : "Odyssey Combat Console";
   }
   if (ui.pageSubtitle) {
-    ui.pageSubtitle.textContent = IS_COMBAT_LOG_VIEW ? "Shared combat history for the current room." : "Select an attacker token, choose a target token, and resolve combat here.";
+    ui.pageSubtitle.textContent = IS_COMBAT_LOG_VIEW ? "Shared combat history for the current room. Drag this header to reposition the window." : "Select an attacker token, choose a target token, and resolve combat here.";
   }
 }
-async function openCombatLogWindow() {
-  await lib_default.modal.open({
-    id: COMBAT_LOG_MODAL_ID,
-    url: getViewUrl("combat-log"),
-    width: 760,
-    height: 720
-  });
+async function openCombatLogWindow(position = getCombatLogPosition()) {
+  await lib_default.popover.open(buildCombatLogPopoverOptions(position));
 }
 async function closeCombatLogWindow() {
-  await lib_default.modal.close(COMBAT_LOG_MODAL_ID);
+  await lib_default.popover.close(COMBAT_LOG_POPOVER_ID);
+}
+function queueCombatLogMove(position) {
+  combatLogMovePendingPosition = saveCombatLogPosition(position);
+  if (combatLogMoveTimer) return;
+  combatLogMoveTimer = setTimeout(() => {
+    combatLogMoveTimer = null;
+    const nextPosition = combatLogMovePendingPosition;
+    combatLogMovePendingPosition = null;
+    void lib_default.popover.open(buildCombatLogPopoverOptions(nextPosition)).catch((error) => {
+      console.warn("[Body HP] Unable to move combat log", error);
+    }).finally(() => {
+      if (combatLogMovePendingPosition) {
+        queueCombatLogMove(combatLogMovePendingPosition);
+      }
+    });
+  }, 16);
+}
+function bindCombatLogDrag() {
+  if (!IS_COMBAT_LOG_VIEW || !ui.pageHeader) return;
+  const handlePointerDown = (event) => {
+    if (event.button !== 0) return;
+    combatLogDragState = {
+      pointerId: event.pointerId,
+      lastScreenX: event.screenX,
+      lastScreenY: event.screenY,
+      position: getCombatLogPosition()
+    };
+    ui.pageHeader.setPointerCapture(event.pointerId);
+    document.body.classList.add("combat-log-dragging");
+    event.preventDefault();
+  };
+  const handlePointerMove = (event) => {
+    if (!combatLogDragState || event.pointerId !== combatLogDragState.pointerId) return;
+    const deltaX = event.screenX - combatLogDragState.lastScreenX;
+    const deltaY = event.screenY - combatLogDragState.lastScreenY;
+    if (!deltaX && !deltaY) return;
+    combatLogDragState.lastScreenX = event.screenX;
+    combatLogDragState.lastScreenY = event.screenY;
+    combatLogDragState.position = {
+      left: Math.max(0, combatLogDragState.position.left + deltaX),
+      top: Math.max(0, combatLogDragState.position.top + deltaY)
+    };
+    queueCombatLogMove(combatLogDragState.position);
+  };
+  const finishDrag = (event) => {
+    if (!combatLogDragState || event.pointerId !== combatLogDragState.pointerId) return;
+    if (ui.pageHeader.hasPointerCapture(event.pointerId)) {
+      ui.pageHeader.releasePointerCapture(event.pointerId);
+    }
+    saveCombatLogPosition(combatLogDragState.position);
+    combatLogDragState = null;
+    document.body.classList.remove("combat-log-dragging");
+  };
+  ui.pageHeader.addEventListener("pointerdown", handlePointerDown);
+  ui.pageHeader.addEventListener("pointermove", handlePointerMove);
+  ui.pageHeader.addEventListener("pointerup", finishDrag);
+  ui.pageHeader.addEventListener("pointercancel", finishDrag);
 }
 function sanitizeDebugEntries(raw) {
   if (!Array.isArray(raw)) return [];
@@ -6142,6 +6257,7 @@ lib_default.onReady(async () => {
   try {
     applyPageView();
     bindUiEvents();
+    bindCombatLogDrag();
     await loadSharedDebugConsole();
     await syncState(true);
     startSelectionPolling();
