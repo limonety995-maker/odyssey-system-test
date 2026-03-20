@@ -813,13 +813,15 @@ async function pushDebugEntry(title, body, kind = "info") {
   await OBR.broadcast.sendMessage(
     DEBUG_BROADCAST_CHANNEL,
     { type: "debug-entry", entry },
-    { destination: "REMOTE" },
+    { destination: "ALL" },
   );
 
-  if (playerRole === "GM") {
+  try {
     await OBR.room.setMetadata({
       [DEBUG_LOG_KEY]: nextEntries,
     });
+  } catch (error) {
+    console.warn("[Body HP] Unable to persist debug entry to room metadata", error);
   }
 }
 
