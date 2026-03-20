@@ -100,8 +100,6 @@ const attackFormDrafts = new Map();
 const inputAutosaveTimers = new Map();
 let selectionPollTimer = null;
 let combatLogDragState = null;
-let combatLogMoveTimer = null;
-let combatLogMovePendingPosition = null;
 let combatLogPosition = null;
 
 function getViewUrl(view) {
@@ -182,7 +180,7 @@ function applyPageView() {
 
   if (ui.pageSubtitle) {
     ui.pageSubtitle.textContent = IS_COMBAT_LOG_VIEW
-      ? "Shared combat history for the current room. Drag this header to reposition the window."
+      ? "Shared combat history for the current room. Drag and release this header to reposition the window."
       : "Select an attacker token, choose a target token, and resolve combat here.";
   }
 }
@@ -195,27 +193,6 @@ async function closeCombatLogWindow() {
   await OBR.popover.close(COMBAT_LOG_POPOVER_ID);
 }
 
-function queueCombatLogMove(position) {
-  combatLogMovePendingPosition = saveCombatLogPosition(position);
-  if (combatLogMoveTimer) return;
-
-  combatLogMoveTimer = setTimeout(() => {
-    combatLogMoveTimer = null;
-    const nextPosition = combatLogMovePendingPosition;
-    combatLogMovePendingPosition = null;
-    void OBR.popover
-      .open(buildCombatLogPopoverOptions(nextPosition))
-      .catch((error) => {
-        console.warn("[Body HP] Unable to move combat log", error);
-      })
-      .finally(() => {
-        if (combatLogMovePendingPosition) {
-          queueCombatLogMove(combatLogMovePendingPosition);
-        }
-      });
-  }, 16);
-}
-
 function bindCombatLogDrag() {
   if (!IS_COMBAT_LOG_VIEW || !ui.pageHeader) return;
 
@@ -226,6 +203,8 @@ function bindCombatLogDrag() {
       pointerId: event.pointerId,
       lastScreenX: event.screenX,
       lastScreenY: event.screenY,
+      startScreenX: event.screenX,
+      startScreenY: event.screenY,
       position: getCombatLogPosition(),
     };
 
@@ -247,8 +226,6 @@ function bindCombatLogDrag() {
       left: Math.max(0, combatLogDragState.position.left + deltaX),
       top: Math.max(0, combatLogDragState.position.top + deltaY),
     };
-
-    queueCombatLogMove(combatLogDragState.position);
   };
 
   const finishDrag = (event) => {
@@ -258,9 +235,17 @@ function bindCombatLogDrag() {
       ui.pageHeader.releasePointerCapture(event.pointerId);
     }
 
-    saveCombatLogPosition(combatLogDragState.position);
+    const finalPosition = saveCombatLogPosition(combatLogDragState.position);
+    const dragDistance = Math.abs(event.screenX - combatLogDragState.startScreenX) +
+      Math.abs(event.screenY - combatLogDragState.startScreenY);
     combatLogDragState = null;
     document.body.classList.remove("combat-log-dragging");
+
+    if (dragDistance >= 4) {
+      void openCombatLogWindow(finalPosition).catch((error) => {
+        console.warn("[Body HP] Unable to finalize combat log move", error);
+      });
+    }
   };
 
   ui.pageHeader.addEventListener("pointerdown", handlePointerDown);
