@@ -28,11 +28,22 @@ const DEBUG_LOG_KEY = "com.codex.body-hp/debugLog";
 const DEBUG_BROADCAST_CHANNEL = "com.codex.body-hp/debug";
 const COMBAT_LOG_POPOVER_ID = `${EXTENSION_ID}/combat-log`;
 const COMBAT_LOG_POSITION_KEY = `${COMBAT_LOG_POPOVER_ID}/position`;
-const COMBAT_LOG_WIDTH = 760;
-const COMBAT_LOG_HEIGHT = 720;
+const COMBAT_LOG_SIZE_KEY = `${COMBAT_LOG_POPOVER_ID}/size`;
 const DEFAULT_COMBAT_LOG_POSITION = {
   left: 32,
   top: 96,
+};
+const DEFAULT_COMBAT_LOG_SIZE = {
+  width: 760,
+  height: 720,
+};
+const MIN_COMBAT_LOG_SIZE = {
+  width: 420,
+  height: 320,
+};
+const MAX_COMBAT_LOG_SIZE = {
+  width: 1400,
+  height: 1100,
 };
 const CORE_COMBAT_SKILLS = Object.keys(DEFAULT_ODYSSEY_SKILLS);
 const ATTACK_ONLY_EXCLUDED_SKILLS = new Set([PARRY_SKILL_NAME]);
@@ -66,6 +77,7 @@ const ATTRIBUTE_UI_FIELDS = [
 ];
 
 const ui = {
+  appRoot: document.getElementById("app"),
   pageHeader: document.getElementById("pageHeader"),
   pageTitle: document.getElementById("pageTitle"),
   pageSubtitle: document.getElementById("pageSubtitle"),
@@ -84,6 +96,7 @@ const ui = {
   allTokensSection: document.getElementById("allTokensSection"),
   allCount: document.getElementById("allCount"),
   allTokensList: document.getElementById("allTokensList"),
+  combatLogResizeHandle: document.getElementById("combatLogResizeHandle"),
 };
 
 let playerRole = "PLAYER";
@@ -101,6 +114,16 @@ const inputAutosaveTimers = new Map();
 let selectionPollTimer = null;
 let combatLogDragState = null;
 let combatLogPosition = null;
+let combatLogSize = null;
+let combatLogResizeState = null;
+let combatLogResizeFrame = 0;
+const combatLogPreviewOffset = {
+  currentLeft: 0,
+  currentTop: 0,
+  targetLeft: 0,
+  targetTop: 0,
+  frameId: 0,
+};
 
 function getViewUrl(view) {
   const url = new URL(window.location.href);
@@ -112,6 +135,21 @@ function normalizeCombatLogPosition(raw) {
   return {
     left: Math.max(0, Math.round(Number(raw?.left) || DEFAULT_COMBAT_LOG_POSITION.left)),
     top: Math.max(0, Math.round(Number(raw?.top) || DEFAULT_COMBAT_LOG_POSITION.top)),
+  };
+}
+
+function normalizeCombatLogSize(raw) {
+  return {
+    width: clamp(
+      Math.round(Number(raw?.width) || DEFAULT_COMBAT_LOG_SIZE.width),
+      MIN_COMBAT_LOG_SIZE.width,
+      MAX_COMBAT_LOG_SIZE.width,
+    ),
+    height: clamp(
+      Math.round(Number(raw?.height) || DEFAULT_COMBAT_LOG_SIZE.height),
+      MIN_COMBAT_LOG_SIZE.height,
+      MAX_COMBAT_LOG_SIZE.height,
+    ),
   };
 }
 
@@ -146,12 +184,100 @@ function saveCombatLogPosition(position) {
   return { ...combatLogPosition };
 }
 
-function buildCombatLogPopoverOptions(position) {
+function getCombatLogSize() {
+  if (combatLogSize) {
+    return { ...combatLogSize };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(COMBAT_LOG_SIZE_KEY);
+    if (raw) {
+      combatLogSize = normalizeCombatLogSize(JSON.parse(raw));
+      return { ...combatLogSize };
+    }
+  } catch (error) {
+    console.warn("[Body HP] Unable to read combat log size", error);
+  }
+
+  combatLogSize = { ...DEFAULT_COMBAT_LOG_SIZE };
+  return { ...combatLogSize };
+}
+
+function saveCombatLogSize(size) {
+  combatLogSize = normalizeCombatLogSize(size);
+
+  try {
+    window.localStorage.setItem(COMBAT_LOG_SIZE_KEY, JSON.stringify(combatLogSize));
+  } catch (error) {
+    console.warn("[Body HP] Unable to persist combat log size", error);
+  }
+
+  return { ...combatLogSize };
+}
+
+function applyCombatLogPreviewOffset(left = 0, top = 0) {
+  if (!ui.appRoot) return;
+  ui.appRoot.style.setProperty("--combat-log-preview-x", `${Math.round(left)}px`);
+  ui.appRoot.style.setProperty("--combat-log-preview-y", `${Math.round(top)}px`);
+}
+
+function stepCombatLogPreviewOffset() {
+  combatLogPreviewOffset.frameId = 0;
+
+  combatLogPreviewOffset.currentLeft +=
+    (combatLogPreviewOffset.targetLeft - combatLogPreviewOffset.currentLeft) * 0.35;
+  combatLogPreviewOffset.currentTop +=
+    (combatLogPreviewOffset.targetTop - combatLogPreviewOffset.currentTop) * 0.35;
+
+  const isSettled =
+    Math.abs(combatLogPreviewOffset.targetLeft - combatLogPreviewOffset.currentLeft) < 0.5 &&
+    Math.abs(combatLogPreviewOffset.targetTop - combatLogPreviewOffset.currentTop) < 0.5;
+
+  if (isSettled) {
+    combatLogPreviewOffset.currentLeft = combatLogPreviewOffset.targetLeft;
+    combatLogPreviewOffset.currentTop = combatLogPreviewOffset.targetTop;
+  }
+
+  applyCombatLogPreviewOffset(
+    combatLogPreviewOffset.currentLeft,
+    combatLogPreviewOffset.currentTop,
+  );
+
+  if (!isSettled) {
+    combatLogPreviewOffset.frameId = window.requestAnimationFrame(stepCombatLogPreviewOffset);
+  }
+}
+
+function setCombatLogPreviewOffset(left = 0, top = 0, immediate = false) {
+  combatLogPreviewOffset.targetLeft = Number(left) || 0;
+  combatLogPreviewOffset.targetTop = Number(top) || 0;
+
+  if (immediate) {
+    if (combatLogPreviewOffset.frameId) {
+      window.cancelAnimationFrame(combatLogPreviewOffset.frameId);
+      combatLogPreviewOffset.frameId = 0;
+    }
+    combatLogPreviewOffset.currentLeft = combatLogPreviewOffset.targetLeft;
+    combatLogPreviewOffset.currentTop = combatLogPreviewOffset.targetTop;
+    applyCombatLogPreviewOffset(
+      combatLogPreviewOffset.currentLeft,
+      combatLogPreviewOffset.currentTop,
+    );
+    return;
+  }
+
+  if (!combatLogPreviewOffset.frameId) {
+    combatLogPreviewOffset.frameId = window.requestAnimationFrame(stepCombatLogPreviewOffset);
+  }
+}
+
+function buildCombatLogPopoverOptions(position, size = getCombatLogSize()) {
+  const normalizedSize = saveCombatLogSize(size);
   return {
     id: COMBAT_LOG_POPOVER_ID,
     url: getViewUrl("combat-log"),
-    width: COMBAT_LOG_WIDTH,
-    height: COMBAT_LOG_HEIGHT,
+    width: normalizedSize.width,
+    height: normalizedSize.height,
     anchorReference: "POSITION",
     anchorPosition: saveCombatLogPosition(position),
     anchorOrigin: {
@@ -180,13 +306,16 @@ function applyPageView() {
 
   if (ui.pageSubtitle) {
     ui.pageSubtitle.textContent = IS_COMBAT_LOG_VIEW
-      ? "Shared combat history for the current room. Drag and release this header to reposition the window."
+      ? "Shared combat history for the current room. Drag the header to move and use the bottom-right handle to resize."
       : "Select an attacker token, choose a target token, and resolve combat here.";
   }
 }
 
-async function openCombatLogWindow(position = getCombatLogPosition()) {
-  await OBR.popover.open(buildCombatLogPopoverOptions(position));
+async function openCombatLogWindow(
+  position = getCombatLogPosition(),
+  size = getCombatLogSize(),
+) {
+  await OBR.popover.open(buildCombatLogPopoverOptions(position, size));
 }
 
 async function closeCombatLogWindow() {
@@ -209,6 +338,7 @@ function bindCombatLogDrag() {
     };
 
     ui.pageHeader.setPointerCapture(event.pointerId);
+    setCombatLogPreviewOffset(0, 0, true);
     document.body.classList.add("combat-log-dragging");
     event.preventDefault();
   };
@@ -226,6 +356,10 @@ function bindCombatLogDrag() {
       left: Math.max(0, combatLogDragState.position.left + deltaX),
       top: Math.max(0, combatLogDragState.position.top + deltaY),
     };
+    setCombatLogPreviewOffset(
+      event.screenX - combatLogDragState.startScreenX,
+      event.screenY - combatLogDragState.startScreenY,
+    );
   };
 
   const finishDrag = (event) => {
@@ -239,10 +373,11 @@ function bindCombatLogDrag() {
     const dragDistance = Math.abs(event.screenX - combatLogDragState.startScreenX) +
       Math.abs(event.screenY - combatLogDragState.startScreenY);
     combatLogDragState = null;
+    setCombatLogPreviewOffset(0, 0, true);
     document.body.classList.remove("combat-log-dragging");
 
     if (dragDistance >= 4) {
-      void openCombatLogWindow(finalPosition).catch((error) => {
+      void openCombatLogWindow(finalPosition, getCombatLogSize()).catch((error) => {
         console.warn("[Body HP] Unable to finalize combat log move", error);
       });
     }
@@ -252,6 +387,71 @@ function bindCombatLogDrag() {
   ui.pageHeader.addEventListener("pointermove", handlePointerMove);
   ui.pageHeader.addEventListener("pointerup", finishDrag);
   ui.pageHeader.addEventListener("pointercancel", finishDrag);
+}
+
+function queueCombatLogResize(size) {
+  saveCombatLogSize(size);
+  if (combatLogResizeFrame) return;
+
+  combatLogResizeFrame = window.requestAnimationFrame(() => {
+    combatLogResizeFrame = 0;
+    const nextSize = getCombatLogSize();
+    void Promise.all([
+      OBR.popover.setWidth(COMBAT_LOG_POPOVER_ID, nextSize.width),
+      OBR.popover.setHeight(COMBAT_LOG_POPOVER_ID, nextSize.height),
+    ]).catch((error) => {
+      console.warn("[Body HP] Unable to resize combat log", error);
+    });
+  });
+}
+
+function bindCombatLogResize() {
+  if (!IS_COMBAT_LOG_VIEW || !ui.combatLogResizeHandle) return;
+
+  const handlePointerDown = (event) => {
+    if (event.button !== 0) return;
+
+    const { width: startWidth, height: startHeight } = getCombatLogSize();
+
+    combatLogResizeState = {
+      pointerId: event.pointerId,
+      startScreenX: event.screenX,
+      startScreenY: event.screenY,
+      startWidth,
+      startHeight,
+    };
+
+    ui.combatLogResizeHandle.setPointerCapture(event.pointerId);
+    document.body.classList.add("combat-log-resizing");
+    event.preventDefault();
+  };
+
+  const handlePointerMove = (event) => {
+    if (!combatLogResizeState || event.pointerId !== combatLogResizeState.pointerId) return;
+
+    queueCombatLogResize({
+      width: combatLogResizeState.startWidth + (event.screenX - combatLogResizeState.startScreenX),
+      height: combatLogResizeState.startHeight + (event.screenY - combatLogResizeState.startScreenY),
+    });
+  };
+
+  const finishResize = (event) => {
+    if (!combatLogResizeState || event.pointerId !== combatLogResizeState.pointerId) return;
+
+    if (ui.combatLogResizeHandle.hasPointerCapture(event.pointerId)) {
+      ui.combatLogResizeHandle.releasePointerCapture(event.pointerId);
+    }
+
+    combatLogResizeState = null;
+    document.body.classList.remove("combat-log-resizing");
+  };
+
+  ui.combatLogResizeHandle.addEventListener("pointerdown", (event) => {
+    handlePointerDown(event);
+  });
+  ui.combatLogResizeHandle.addEventListener("pointermove", handlePointerMove);
+  ui.combatLogResizeHandle.addEventListener("pointerup", finishResize);
+  ui.combatLogResizeHandle.addEventListener("pointercancel", finishResize);
 }
 
 function sanitizeDebugEntries(raw) {
@@ -3093,6 +3293,7 @@ OBR.onReady(async () => {
     applyPageView();
     bindUiEvents();
     bindCombatLogDrag();
+    bindCombatLogResize();
     await loadSharedDebugConsole();
     await syncState(true);
     startSelectionPolling();
