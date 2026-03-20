@@ -78,7 +78,7 @@ body.view-combat-log #pageSubtitle {
 
 body.view-combat-log #combatLogResizeHandle {
   display: block;
-  position: fixed;
+  position: absolute;
   right: 10px;
   bottom: 10px;
   width: 22px;

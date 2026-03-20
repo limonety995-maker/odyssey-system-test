@@ -4435,13 +4435,13 @@ function saveCombatLogSize(size) {
 }
 function applyCombatLogPreviewOffset(left = 0, top = 0) {
   if (!ui.appRoot) return;
-  ui.appRoot.style.setProperty("--combat-log-preview-x", `${Math.round(left)}px`);
-  ui.appRoot.style.setProperty("--combat-log-preview-y", `${Math.round(top)}px`);
+  ui.appRoot.style.setProperty("--combat-log-preview-x", `${left}px`);
+  ui.appRoot.style.setProperty("--combat-log-preview-y", `${top}px`);
 }
 function stepCombatLogPreviewOffset() {
   combatLogPreviewOffset.frameId = 0;
-  combatLogPreviewOffset.currentLeft += (combatLogPreviewOffset.targetLeft - combatLogPreviewOffset.currentLeft) * 0.35;
-  combatLogPreviewOffset.currentTop += (combatLogPreviewOffset.targetTop - combatLogPreviewOffset.currentTop) * 0.35;
+  combatLogPreviewOffset.currentLeft += (combatLogPreviewOffset.targetLeft - combatLogPreviewOffset.currentLeft) * 0.42;
+  combatLogPreviewOffset.currentTop += (combatLogPreviewOffset.targetTop - combatLogPreviewOffset.currentTop) * 0.42;
   const isSettled = Math.abs(combatLogPreviewOffset.targetLeft - combatLogPreviewOffset.currentLeft) < 0.5 && Math.abs(combatLogPreviewOffset.targetTop - combatLogPreviewOffset.currentTop) < 0.5;
   if (isSettled) {
     combatLogPreviewOffset.currentLeft = combatLogPreviewOffset.targetLeft;
@@ -4474,6 +4474,10 @@ function setCombatLogPreviewOffset(left = 0, top = 0, immediate = false) {
   if (!combatLogPreviewOffset.frameId) {
     combatLogPreviewOffset.frameId = window.requestAnimationFrame(stepCombatLogPreviewOffset);
   }
+}
+function getPointerSample(event) {
+  const coalescedEvents = event.getCoalescedEvents?.();
+  return Array.isArray(coalescedEvents) && coalescedEvents.length ? coalescedEvents[coalescedEvents.length - 1] : event;
 }
 function buildCombatLogPopoverOptions(position, size = getCombatLogSize()) {
   const normalizedSize = saveCombatLogSize(size);
@@ -4517,13 +4521,12 @@ function bindCombatLogDrag() {
   if (!IS_COMBAT_LOG_VIEW || !ui.pageHeader) return;
   const handlePointerDown = (event) => {
     if (event.button !== 0) return;
+    const pointer = getPointerSample(event);
     combatLogDragState = {
       pointerId: event.pointerId,
-      lastScreenX: event.screenX,
-      lastScreenY: event.screenY,
-      startScreenX: event.screenX,
-      startScreenY: event.screenY,
-      position: getCombatLogPosition()
+      startScreenX: pointer.screenX,
+      startScreenY: pointer.screenY,
+      originPosition: getCombatLogPosition()
     };
     ui.pageHeader.setPointerCapture(event.pointerId);
     setCombatLogPreviewOffset(0, 0, true);
@@ -4532,27 +4535,26 @@ function bindCombatLogDrag() {
   };
   const handlePointerMove = (event) => {
     if (!combatLogDragState || event.pointerId !== combatLogDragState.pointerId) return;
-    const deltaX = event.screenX - combatLogDragState.lastScreenX;
-    const deltaY = event.screenY - combatLogDragState.lastScreenY;
-    if (!deltaX && !deltaY) return;
-    combatLogDragState.lastScreenX = event.screenX;
-    combatLogDragState.lastScreenY = event.screenY;
+    const pointer = getPointerSample(event);
+    const deltaX = pointer.screenX - combatLogDragState.startScreenX;
+    const deltaY = pointer.screenY - combatLogDragState.startScreenY;
     combatLogDragState.position = {
-      left: Math.max(0, combatLogDragState.position.left + deltaX),
-      top: Math.max(0, combatLogDragState.position.top + deltaY)
+      left: Math.max(0, combatLogDragState.originPosition.left + deltaX),
+      top: Math.max(0, combatLogDragState.originPosition.top + deltaY)
     };
     setCombatLogPreviewOffset(
-      event.screenX - combatLogDragState.startScreenX,
-      event.screenY - combatLogDragState.startScreenY
+      deltaX,
+      deltaY
     );
   };
   const finishDrag = (event) => {
     if (!combatLogDragState || event.pointerId !== combatLogDragState.pointerId) return;
+    const pointer = getPointerSample(event);
     if (ui.pageHeader.hasPointerCapture(event.pointerId)) {
       ui.pageHeader.releasePointerCapture(event.pointerId);
     }
     const finalPosition = saveCombatLogPosition(combatLogDragState.position);
-    const dragDistance = Math.abs(event.screenX - combatLogDragState.startScreenX) + Math.abs(event.screenY - combatLogDragState.startScreenY);
+    const dragDistance = Math.abs(pointer.screenX - combatLogDragState.startScreenX) + Math.abs(pointer.screenY - combatLogDragState.startScreenY);
     combatLogDragState = null;
     setCombatLogPreviewOffset(0, 0, true);
     document.body.classList.remove("combat-log-dragging");
@@ -4581,15 +4583,31 @@ function queueCombatLogResize(size) {
     });
   });
 }
+async function finalizeCombatLogResize() {
+  const expectedSize = getCombatLogSize();
+  try {
+    const [actualWidth, actualHeight] = await Promise.all([
+      lib_default.popover.getWidth(COMBAT_LOG_POPOVER_ID),
+      lib_default.popover.getHeight(COMBAT_LOG_POPOVER_ID)
+    ]);
+    const widthMatches = Math.abs((Number(actualWidth) || 0) - expectedSize.width) <= 1;
+    const heightMatches = Math.abs((Number(actualHeight) || 0) - expectedSize.height) <= 1;
+    if (widthMatches && heightMatches) return;
+  } catch (error) {
+    console.warn("[Body HP] Unable to verify resized combat log dimensions", error);
+  }
+  await openCombatLogWindow(getCombatLogPosition(), expectedSize);
+}
 function bindCombatLogResize() {
   if (!IS_COMBAT_LOG_VIEW || !ui.combatLogResizeHandle) return;
   const handlePointerDown = (event) => {
     if (event.button !== 0) return;
+    const pointer = getPointerSample(event);
     const { width: startWidth, height: startHeight } = getCombatLogSize();
     combatLogResizeState = {
       pointerId: event.pointerId,
-      startScreenX: event.screenX,
-      startScreenY: event.screenY,
+      startScreenX: pointer.screenX,
+      startScreenY: pointer.screenY,
       startWidth,
       startHeight
     };
@@ -4599,18 +4617,26 @@ function bindCombatLogResize() {
   };
   const handlePointerMove = (event) => {
     if (!combatLogResizeState || event.pointerId !== combatLogResizeState.pointerId) return;
+    const pointer = getPointerSample(event);
     queueCombatLogResize({
-      width: combatLogResizeState.startWidth + (event.screenX - combatLogResizeState.startScreenX),
-      height: combatLogResizeState.startHeight + (event.screenY - combatLogResizeState.startScreenY)
+      width: combatLogResizeState.startWidth + (pointer.screenX - combatLogResizeState.startScreenX),
+      height: combatLogResizeState.startHeight + (pointer.screenY - combatLogResizeState.startScreenY)
     });
   };
   const finishResize = (event) => {
     if (!combatLogResizeState || event.pointerId !== combatLogResizeState.pointerId) return;
+    const pointer = getPointerSample(event);
+    const resizeDistance = Math.abs(pointer.screenX - combatLogResizeState.startScreenX) + Math.abs(pointer.screenY - combatLogResizeState.startScreenY);
     if (ui.combatLogResizeHandle.hasPointerCapture(event.pointerId)) {
       ui.combatLogResizeHandle.releasePointerCapture(event.pointerId);
     }
     combatLogResizeState = null;
     document.body.classList.remove("combat-log-resizing");
+    if (resizeDistance >= 4) {
+      void finalizeCombatLogResize().catch((error) => {
+        console.warn("[Body HP] Unable to finalize combat log resize", error);
+      });
+    }
   };
   ui.combatLogResizeHandle.addEventListener("pointerdown", (event) => {
     handlePointerDown(event);
