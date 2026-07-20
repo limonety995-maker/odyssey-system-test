@@ -17,7 +17,7 @@ namespace Alik.VGE.MechanoidSignalFix
         private const string InteractiveSpawnPartTypeName = "VanillaGravshipExpanded.QuestPart_SpawnThingInteractive";
         private const string GravshipUtilityTypeName = "VanillaGravshipExpanded.GravshipUtility";
 
-        public override void RunInt()
+        protected override void RunInt()
         {
             Quest quest = QuestGen.quest;
             Map map = QuestGen_Get.GetMap();
@@ -63,7 +63,7 @@ namespace Alik.VGE.MechanoidSignalFix
             quest.End(QuestEndOutcome.Success, 0, null, landingStructureSpawnedSignal);
         }
 
-        public override bool TestRunInt(Slate slate)
+        protected override bool TestRunInt(Slate slate)
         {
             if (QuestGen_Get.GetMap() == null)
             {
