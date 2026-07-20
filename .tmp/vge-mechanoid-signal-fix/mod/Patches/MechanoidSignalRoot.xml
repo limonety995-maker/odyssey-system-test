@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+  <Operation Class="PatchOperationReplace">
+    <xpath>/Defs/QuestScriptDef[defName="MechanoidSignal"]/root</xpath>
+    <value>
+      <root Class="Alik.VGE.MechanoidSignalFix.QuestNode_Root_MechanoidSignal_Fixed" />
+    </value>
+  </Operation>
+</Patch>
