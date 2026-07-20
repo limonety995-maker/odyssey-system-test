@@ -1,0 +1,67 @@
+name: Build MFI Mystical Shaman Fix
+
+on:
+  push:
+    branches:
+      - tmp-vge-mechanoid-signal-fix-build
+    paths:
+      - '.tmp/mfi-mystical-shaman-fix/**'
+      - '.github/workflows/build-mfi-mystical-shaman-fix.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.tmp/mfi-mystical-shaman-fix/**'
+      - '.github/workflows/build-mfi-mystical-shaman-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore .tmp/mfi-mystical-shaman-fix/MFIMysticalShamanFix.csproj
+
+      - name: Build
+        run: dotnet build .tmp/mfi-mystical-shaman-fix/MFIMysticalShamanFix.csproj -c Release --no-restore 2>&1 | tee build.log
+
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MFI-build-log
+          path: build.log
+
+      - name: Package mod
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/.tmp/mfi-mystical-shaman-fix"
+          STAGE="$GITHUB_WORKSPACE/dist/MFI Mystical Shaman Def Fix"
+          mkdir -p "$STAGE/Assemblies" "$STAGE/About"
+          cp "$ROOT/bin/Release/net472/Alik.MFIMysticalShamanFix.dll" "$STAGE/Assemblies/"
+          cp "$ROOT/mod/About/About.xml" "$STAGE/About/"
+          cp "$ROOT/mod/README_RU.txt" "$STAGE/"
+          cp "$ROOT/MFIMysticalShamanFix.cs" "$STAGE/MFIMysticalShamanFix.cs"
+          cd "$GITHUB_WORKSPACE/dist"
+          zip -r MFI_Mystical_Shaman_Def_Fix_v3_1.6.zip "MFI Mystical Shaman Def Fix"
+
+      - name: Upload mod artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MFI_Mystical_Shaman_Def_Fix_v3_1.6
+          path: dist/MFI_Mystical_Shaman_Def_Fix_v3_1.6.zip
+          if-no-files-found: error
