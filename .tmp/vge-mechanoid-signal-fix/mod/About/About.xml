@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>VGE Mechanoid Signal Fix</name>
+  <author>Alik</author>
+  <packageId>alik.vge.mechanoidsignal.fix</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+
+  <modDependencies>
+    <li>
+      <packageId>vanillaexpanded.gravship</packageId>
+      <displayName>Vanilla Gravship Expanded - Chapter 1</displayName>
+    </li>
+    <li>
+      <packageId>Ludeon.RimWorld.Odyssey</packageId>
+      <displayName>RimWorld - Odyssey</displayName>
+    </li>
+  </modDependencies>
+
+  <loadAfter>
+    <li>vanillaexpanded.gravship</li>
+  </loadAfter>
+
+  <description>
+Fixes the Mechanoid Signal quest from Vanilla Gravship Expanded without disabling it.
+
+The original quest creates VGE Astropedes and Hunters during quest generation and deep-saves them inside an unspawned skyfaller. Loading those pawns before the game's FactionManager is ready can cause BackCompatibilityConverter and MechEnergy null-reference errors.
+
+This patch keeps the quest, wrecked gravjumper, reward, mechanoid composition and threat scaling, but generates the mechanoids only when the wreck actually lands on the map.
+  </description>
+</ModMetaData>
