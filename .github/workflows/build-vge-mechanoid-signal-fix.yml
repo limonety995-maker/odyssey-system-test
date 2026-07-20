@@ -7,6 +7,12 @@ on:
     paths:
       - '.tmp/vge-mechanoid-signal-fix/**'
       - '.github/workflows/build-vge-mechanoid-signal-fix.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.tmp/vge-mechanoid-signal-fix/**'
+      - '.github/workflows/build-vge-mechanoid-signal-fix.yml'
   workflow_dispatch:
 
 permissions:
