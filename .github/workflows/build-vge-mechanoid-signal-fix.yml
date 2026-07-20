@@ -34,7 +34,21 @@ jobs:
         run: dotnet restore .tmp/vge-mechanoid-signal-fix/VGEMechanoidSignalFix.csproj
 
       - name: Build
-        run: dotnet build .tmp/vge-mechanoid-signal-fix/VGEMechanoidSignalFix.csproj -c Release --no-restore
+        shell: bash
+        run: |
+          set +e
+          dotnet build .tmp/vge-mechanoid-signal-fix/VGEMechanoidSignalFix.csproj -c Release --no-restore > build.log 2>&1
+          status=$?
+          tail -n 80 build.log
+          exit $status
+
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VGE-build-log
+          path: build.log
+          if-no-files-found: warn
 
       - name: Package mod
         shell: bash
@@ -51,7 +65,7 @@ jobs:
           cd "$GITHUB_WORKSPACE/dist"
           zip -r VGE_Mechanoid_Signal_Fix_1.6.zip "VGE Mechanoid Signal Fix"
 
-      - name: Upload artifact
+      - name: Upload mod artifact
         uses: actions/upload-artifact@v4
         with:
           name: VGE_Mechanoid_Signal_Fix_1.6
