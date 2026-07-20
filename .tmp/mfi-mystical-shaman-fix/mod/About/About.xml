@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>MFI Mystical Shaman Def Fix v3</name>
+  <author>Alik</author>
+  <packageId>alik.mfi.mysticalshaman.def.fix</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+
+  <modDependencies>
+    <li>
+      <packageId>Mlie.MoreFactionInteraction</packageId>
+      <displayName>More Faction Interaction (Continued)</displayName>
+      <steamWorkshopUrl>https://steamcommunity.com/sharedfiles/filedetails/?id=2379076640</steamWorkshopUrl>
+    </li>
+    <li>
+      <packageId>VanillaExpanded.VEE</packageId>
+      <displayName>Vanilla Events Expanded</displayName>
+      <steamWorkshopUrl>https://steamcommunity.com/sharedfiles/filedetails/?id=1938420742</steamWorkshopUrl>
+      <downloadUrl>https://github.com/Vanilla-Expanded/VanillaEventsExpanded</downloadUrl>
+    </li>
+  </modDependencies>
+
+  <loadAfter>
+    <li>Mlie.MoreFactionInteraction</li>
+    <li>VanillaExpanded.VEE</li>
+    <li>alik.mfi.russian.fixed</li>
+  </loadAfter>
+
+  <description>
+Prevents Vanilla Events Expanded from removing More Faction Interaction's MFI_MysticalShaman IncidentDef.
+
+MFI keeps a hard reference to this incident and can throw a null-reference error when VEE disables/removes it through the event settings. Version 3 no longer replaces the XML Def, preserving its proper mod ownership and avoiding the VEE DefsAlterer static-constructor crash caused by version 2.
+  </description>
+</ModMetaData>
