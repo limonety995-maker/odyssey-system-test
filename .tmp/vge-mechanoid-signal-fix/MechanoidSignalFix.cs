@@ -11,6 +11,7 @@ namespace Alik.VGE.MechanoidSignalFix
 {
     public sealed class QuestNode_Root_MechanoidSignal_Fixed : QuestNode
     {
+        private const int SkyfallerDelayTicks = 3000;
         private const string LandingStructureDefName = "VGE_LandingStructure";
         private const string DamagedLayoutDefName = "VGE_StartingGravjumperDamaged";
         private const string GravjumperEngineDefName = "VGE_GravjumperEngine";
@@ -44,13 +45,20 @@ namespace Alik.VGE.MechanoidSignalFix
 
             float threatPoints = StorytellerUtility.DefaultThreatPointsNow(map);
             int chunkAmount = Mathf.Max((int)(threatPoints / 1000f), 1);
-            quest.AddPart(new QuestPart_DeferredMechanoidDrop
-            {
-                inSignal = landingStructureSpawnedSignal,
-                mapParent = map.Parent,
-                tryLandNearThing = landingStructure,
-                chunkAmount = chunkAmount
-            });
+
+            quest.Delay(
+                SkyfallerDelayTicks,
+                delegate
+                {
+                    quest.AddPart(new QuestPart_DeferredMechanoidDrop
+                    {
+                        inSignal = QuestGen.slate.Get<string>("inSignal"),
+                        mapParent = map.Parent,
+                        tryLandNearThing = landingStructure,
+                        chunkAmount = chunkAmount
+                    });
+                },
+                landingStructureSpawnedSignal);
 
             QuestPart_Choice choicePart = quest.RewardChoice();
             QuestPart_Choice.Choice choice = new QuestPart_Choice.Choice();
