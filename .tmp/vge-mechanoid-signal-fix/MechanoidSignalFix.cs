@@ -16,7 +16,6 @@ namespace Alik.VGE.MechanoidSignalFix
         private const string DamagedLayoutDefName = "VGE_StartingGravjumperDamaged";
         private const string GravjumperEngineDefName = "VGE_GravjumperEngine";
         private const string InteractiveSpawnPartTypeName = "VanillaGravshipExpanded.QuestPart_SpawnThingInteractive";
-        private const string GravshipUtilityTypeName = "RimWorld.GravshipUtility";
 
         protected override void RunInt()
         {
@@ -78,17 +77,7 @@ namespace Alik.VGE.MechanoidSignalFix
                 return false;
             }
 
-            Type utilityType = ReflectionUtility.FindType(GravshipUtilityTypeName);
-            MethodInfo method = utilityType.GetMethod(
-                "PlayerHasGravEngine",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            if (method == null)
-            {
-                Log.Error("[VGE Mechanoid Signal Fix] Could not find RimWorld.GravshipUtility.PlayerHasGravEngine.");
-                return false;
-            }
-
-            return !(bool)method.Invoke(null, null);
+            return !GravshipUtility.PlayerHasGravEngine();
         }
 
         private static Thing MakeLandingStructure()
