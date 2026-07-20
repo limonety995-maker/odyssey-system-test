@@ -1,0 +1,53 @@
+name: Build VGE Mechanoid Signal Fix
+
+on:
+  push:
+    branches:
+      - tmp-vge-mechanoid-signal-fix-build
+    paths:
+      - '.tmp/vge-mechanoid-signal-fix/**'
+      - '.github/workflows/build-vge-mechanoid-signal-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore .tmp/vge-mechanoid-signal-fix/VGEMechanoidSignalFix.csproj
+
+      - name: Build
+        run: dotnet build .tmp/vge-mechanoid-signal-fix/VGEMechanoidSignalFix.csproj -c Release --no-restore
+
+      - name: Package mod
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/.tmp/vge-mechanoid-signal-fix"
+          STAGE="$GITHUB_WORKSPACE/dist/VGE Mechanoid Signal Fix"
+          mkdir -p "$STAGE/Assemblies" "$STAGE/About" "$STAGE/Patches"
+          cp "$ROOT/bin/Release/net472/Alik.VGEMechanoidSignalFix.dll" "$STAGE/Assemblies/"
+          cp "$ROOT/mod/About/About.xml" "$STAGE/About/"
+          cp "$ROOT/mod/Patches/MechanoidSignalRoot.xml" "$STAGE/Patches/"
+          cp "$ROOT/mod/README_RU.txt" "$STAGE/"
+          cp "$ROOT/MechanoidSignalFix.cs" "$STAGE/MechanoidSignalFix.cs"
+          cd "$GITHUB_WORKSPACE/dist"
+          zip -r VGE_Mechanoid_Signal_Fix_1.6.zip "VGE Mechanoid Signal Fix"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VGE_Mechanoid_Signal_Fix_1.6
+          path: dist/VGE_Mechanoid_Signal_Fix_1.6.zip
+          if-no-files-found: error
