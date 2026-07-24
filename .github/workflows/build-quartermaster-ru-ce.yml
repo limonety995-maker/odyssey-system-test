@@ -1,0 +1,66 @@
+name: Build Quartermaster RU CE Patch
+
+on:
+  push:
+    branches:
+      - tmp-quartermaster-ru-ce-build
+    paths:
+      - '.tmp/quartermaster-ru-ce/**'
+      - '.github/workflows/build-quartermaster-ru-ce.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.tmp/quartermaster-ru-ce/**'
+      - '.github/workflows/build-quartermaster-ru-ce.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore .tmp/quartermaster-ru-ce/QuartermasterRussianCE.csproj
+
+      - name: Build
+        shell: bash
+        run: |
+          set +e
+          dotnet build .tmp/quartermaster-ru-ce/QuartermasterRussianCE.csproj -c Release --no-restore > build.log 2>&1
+          status=$?
+          tail -n 160 build.log
+          exit $status
+
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quartermaster-RU-CE-build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Stage DLL
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp .tmp/quartermaster-ru-ce/bin/Release/net472/Alik.QuartermasterRussianCE.dll dist/
+          cp .tmp/quartermaster-ru-ce/bin/Release/net472/Alik.QuartermasterRussianCE.pdb dist/ || true
+
+      - name: Upload compiled assembly
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quartermaster_Russian_CE_Assembly
+          path: dist/*
+          if-no-files-found: error
