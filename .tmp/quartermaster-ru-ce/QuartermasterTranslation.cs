@@ -77,13 +77,20 @@ namespace Alik.QuartermasterRussianCE
                     continue;
                 }
 
-                foreach (MethodBase method in type.GetMethods(
+                IEnumerable<MethodBase> methods = type.GetMethods(
                     BindingFlags.Public | BindingFlags.NonPublic |
                     BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
                     .Cast<MethodBase>()
                     .Concat(type.GetConstructors(
                         BindingFlags.Public | BindingFlags.NonPublic |
-                        BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)))
+                        BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly));
+
+                if (type.TypeInitializer != null)
+                {
+                    methods = methods.Concat(new MethodBase[] { type.TypeInitializer });
+                }
+
+                foreach (MethodBase method in methods)
                 {
                     if (!CanPatch(method) || !ContainsTranslatableString(method))
                     {
