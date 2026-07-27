@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Verse;
 
@@ -18,7 +17,8 @@ namespace Alik.WorldgenGaussShieldFix
             try
             {
                 string languageFolder = LanguageDatabase.activeLanguage?.folderName;
-                if (!string.Equals(languageFolder, "Russian", StringComparison.OrdinalIgnoreCase))
+                if (languageFolder == null ||
+                    !languageFolder.StartsWith("Russian", StringComparison.OrdinalIgnoreCase))
                 {
                     Log.Message("[Alik Worldgen Fix v2] Russian grammar repair skipped because the active language is " +
                         (languageFolder ?? "unknown") + ".");
@@ -28,7 +28,7 @@ namespace Alik.WorldgenGaussShieldFix
                 int namersFixed = 0;
                 foreach (RulePackDef def in DefDatabase<RulePackDef>.AllDefsListForReading)
                 {
-                    if (def?.rulePack == null || def.defName.NullOrEmpty())
+                    if (def == null || def.defName.NullOrEmpty())
                     {
                         continue;
                     }
@@ -37,17 +37,18 @@ namespace Alik.WorldgenGaussShieldFix
                         def.defName.StartsWith("VEE_NamerLandmark_", StringComparison.Ordinal) ||
                         def.defName.StartsWith("VGE_NamerWorldObject_", StringComparison.Ordinal);
 
-                    if (!targeted || !HasRule(def, "terrain_word") || HasRule(def, "r_name"))
+                    if (!targeted)
                     {
                         continue;
                     }
 
-                    if (def.rulePack.rulesStrings == null)
+                    IList<string> rules = GetRulesStrings(def, true);
+                    if (rules == null || !HasRule(rules, "terrain_word") || HasRule(rules, "r_name"))
                     {
-                        def.rulePack.rulesStrings = new List<string>();
+                        continue;
                     }
 
-                    def.rulePack.rulesStrings.Insert(0, "r_name->[terrain_word]");
+                    rules.Insert(0, "r_name->[terrain_word]");
                     ClearRuleCaches(def);
                     namersFixed++;
                 }
@@ -67,7 +68,7 @@ namespace Alik.WorldgenGaussShieldFix
         private static int FixTraderGuildRule()
         {
             RulePackDef def = DefDatabase<RulePackDef>.GetNamedSilentFail("NamerFactionTradersGuild");
-            List<string> rules = def?.rulePack?.rulesStrings;
+            IList<string> rules = GetRulesStrings(def, false);
             if (rules == null)
             {
                 return 0;
@@ -94,15 +95,22 @@ namespace Alik.WorldgenGaussShieldFix
             return fixedCount;
         }
 
-        private static bool HasRule(RulePackDef def, string keyword)
+        private static bool HasRule(IList<string> rules, string keyword)
         {
-            List<string> rules = def?.rulePack?.rulesStrings;
             if (rules == null)
             {
                 return false;
             }
 
-            return rules.Any(rule => RuleKeyword(rule) == keyword);
+            for (int index = 0; index < rules.Count; index++)
+            {
+                if (string.Equals(RuleKeyword(rules[index]), keyword, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string RuleKeyword(string rule)
@@ -128,9 +136,81 @@ namespace Alik.WorldgenGaussShieldFix
             return left;
         }
 
+        private static IList<string> GetRulesStrings(RulePackDef def, bool create)
+        {
+            if (def == null)
+            {
+                return null;
+            }
+
+            object rulePack = GetRulePackObject(def) ?? def;
+            FieldInfo field = FindField(rulePack.GetType(), "rulesStrings");
+            if (field != null)
+            {
+                IList<string> current = field.GetValue(rulePack) as IList<string>;
+                if (current == null && create && !field.IsInitOnly)
+                {
+                    current = new List<string>();
+                    field.SetValue(rulePack, current);
+                }
+                return current;
+            }
+
+            PropertyInfo property = FindProperty(rulePack.GetType(), "rulesStrings");
+            if (property != null)
+            {
+                IList<string> current = property.GetValue(rulePack, null) as IList<string>;
+                if (current == null && create && property.CanWrite)
+                {
+                    current = new List<string>();
+                    property.SetValue(rulePack, current, null);
+                }
+                return current;
+            }
+
+            return null;
+        }
+
+        private static object GetRulePackObject(RulePackDef def)
+        {
+            FieldInfo namedField = FindField(def.GetType(), "rulePack");
+            object value = namedField?.GetValue(def);
+            if (value != null)
+            {
+                return value;
+            }
+
+            PropertyInfo namedProperty = FindProperty(def.GetType(), "rulePack") ??
+                                         FindProperty(def.GetType(), "RulePack");
+            value = namedProperty?.GetValue(def, null);
+            if (value != null)
+            {
+                return value;
+            }
+
+            for (Type type = def.GetType(); type != null; type = type.BaseType)
+            {
+                foreach (FieldInfo field in type.GetFields(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+                {
+                    if (field.FieldType.FullName == "Verse.Grammar.RulePack")
+                    {
+                        value = field.GetValue(def);
+                        if (value != null)
+                        {
+                            return value;
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private static void ClearRuleCaches(RulePackDef def)
         {
-            ClearField(def.rulePack, "rules");
+            object rulePack = GetRulePackObject(def);
+            ClearField(rulePack, "rules");
             ClearField(def, "rulesPlusIncludes");
             ClearField(def, "cachedRulesPlusIncludes");
             ClearField(def, "firstRuleKeyword");
@@ -144,10 +224,7 @@ namespace Alik.WorldgenGaussShieldFix
                 return;
             }
 
-            FieldInfo field = instance.GetType().GetField(
-                fieldName,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
+            FieldInfo field = FindField(instance.GetType(), fieldName);
             if (field == null || field.IsInitOnly)
             {
                 return;
@@ -157,6 +234,38 @@ namespace Alik.WorldgenGaussShieldFix
                 ? Activator.CreateInstance(field.FieldType)
                 : null;
             field.SetValue(instance, value);
+        }
+
+        private static FieldInfo FindField(Type type, string name)
+        {
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                FieldInfo field = current.GetField(
+                    name,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (field != null)
+                {
+                    return field;
+                }
+            }
+
+            return null;
+        }
+
+        private static PropertyInfo FindProperty(Type type, string name)
+        {
+            for (Type current = type; current != null; current = current.BaseType)
+            {
+                PropertyInfo property = current.GetProperty(
+                    name,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                if (property != null)
+                {
+                    return property;
+                }
+            }
+
+            return null;
         }
     }
 }
