@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+  <Operation Class="PatchOperationConditional">
+    <xpath>
+      Defs/ThingDef[
+        defName="VWE_Gun_GaussMagnum" or
+        defName="VWE_Gun_GaussRifle" or
+        defName="VWE_Gun_GaussLance"
+      ]/comps/li[@Class="VEF.Weapons.CompProperties_MultiVerbWeapon"]
+    </xpath>
+    <match Class="PatchOperationRemove">
+      <xpath>
+        Defs/ThingDef[
+          defName="VWE_Gun_GaussMagnum" or
+          defName="VWE_Gun_GaussRifle" or
+          defName="VWE_Gun_GaussLance"
+        ]/comps/li[@Class="VEF.Weapons.CompProperties_MultiVerbWeapon"]
+      </xpath>
+    </match>
+  </Operation>
+
+  <Operation Class="PatchOperationConditional">
+    <xpath>Defs/ThingDef[defName="VAE_Apparel_Shield_Riot"]/apparel/renderNodeProperties</xpath>
+    <nomatch Class="PatchOperationAdd">
+      <xpath>Defs/ThingDef[defName="VAE_Apparel_Shield_Riot"]/apparel</xpath>
+      <value>
+        <renderNodeProperties>
+          <li>
+            <nodeClass>CombatExtended.PawnRenderNode_Apparel</nodeClass>
+            <workerClass>CombatExtended.PawnRenderNodeWorker_Drafted</workerClass>
+            <texPath>Things/Apparel/RiotShield/RiotShield</texPath>
+            <shaderTypeDef>CutoutComplex</shaderTypeDef>
+            <parentTagDef>ApparelBody</parentTagDef>
+            <drawData>
+              <scale>0.8</scale>
+              <defaultData><layer>85</layer></defaultData>
+              <dataEast>
+                <layer>-5</layer>
+                <offset>(0, 0, -0.1)</offset>
+                <rotationOffset>30</rotationOffset>
+              </dataEast>
+              <dataWest><rotationOffset>-30</rotationOffset></dataWest>
+              <dataNorth>
+                <layer>-5</layer>
+                <offset>(0.15, 0, -0.1)</offset>
+              </dataNorth>
+              <dataSouth><offset>(0.15, 0, -0.1)</offset></dataSouth>
+            </drawData>
+          </li>
+        </renderNodeProperties>
+      </value>
+    </nomatch>
+  </Operation>
+</Patch>
