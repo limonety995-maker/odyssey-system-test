@@ -7,6 +7,12 @@ on:
     paths:
       - '.tmp/worldgen-gauss-shield-fix-v2/**'
       - '.github/workflows/build-worldgen-gauss-shield-fix-v2.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.tmp/worldgen-gauss-shield-fix-v2/**'
+      - '.github/workflows/build-worldgen-gauss-shield-fix-v2.yml'
   workflow_dispatch:
 
 permissions:
