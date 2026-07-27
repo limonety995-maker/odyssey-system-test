@@ -1,0 +1,67 @@
+name: Build Worldgen Gauss Shield Fix v2
+
+on:
+  push:
+    branches:
+      - tmp-worldgen-gauss-shield-fix-v2-build
+    paths:
+      - '.tmp/worldgen-gauss-shield-fix-v2/**'
+      - '.github/workflows/build-worldgen-gauss-shield-fix-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore .tmp/worldgen-gauss-shield-fix-v2/WorldgenGaussShieldFix.csproj
+
+      - name: Build
+        shell: bash
+        run: |
+          set +e
+          dotnet build .tmp/worldgen-gauss-shield-fix-v2/WorldgenGaussShieldFix.csproj -c Release --no-restore > build.log 2>&1
+          status=$?
+          tail -n 160 build.log
+          exit $status
+
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Worldgen-Gauss-Shield-v2-build-log
+          path: build.log
+          if-no-files-found: warn
+
+      - name: Package mod
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/.tmp/worldgen-gauss-shield-fix-v2"
+          STAGE="$GITHUB_WORKSPACE/dist/Alik Worldgen Gauss Shield Fix"
+          mkdir -p "$STAGE/Assemblies" "$STAGE/About" "$STAGE/Patches"
+          cp "$ROOT/bin/Release/net472/Alik.WorldgenGaussShieldFix.dll" "$STAGE/Assemblies/"
+          cp "$ROOT/mod/About/About.xml" "$STAGE/About/"
+          cp "$ROOT/mod/Patches/Gauss_and_RiotShield_Fix.xml" "$STAGE/Patches/"
+          cp "$ROOT/mod/README_RU.txt" "$STAGE/"
+          cp "$ROOT/WorldgenGrammarRuntimeFix.cs" "$STAGE/WorldgenGrammarRuntimeFix.cs"
+          cd "$GITHUB_WORKSPACE/dist"
+          zip -r Alik_Worldgen_Gauss_Shield_Fix_v2_1.6.zip "Alik Worldgen Gauss Shield Fix"
+
+      - name: Upload mod artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Alik_Worldgen_Gauss_Shield_Fix_v2_1.6
+          path: dist/Alik_Worldgen_Gauss_Shield_Fix_v2_1.6.zip
+          if-no-files-found: error
