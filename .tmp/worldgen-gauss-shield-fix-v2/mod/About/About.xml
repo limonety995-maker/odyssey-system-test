@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Alik — Worldgen, Gauss and Shield Fix</name>
+  <author>Alik</author>
+  <packageId>alik.worldgen.gauss.shield.fix</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <modDependencies>
+    <li>
+      <packageId>VanillaExpanded.VExplorationE</packageId>
+      <displayName>Vanilla Landmarks Expanded</displayName>
+    </li>
+    <li>
+      <packageId>vanillaexpanded.gravship</packageId>
+      <displayName>Vanilla Gravship Expanded - Chapter 1</displayName>
+    </li>
+    <li>
+      <packageId>VanillaExpanded.VWEC</packageId>
+      <displayName>Vanilla Weapons Expanded - Coilguns</displayName>
+    </li>
+    <li>
+      <packageId>CETeam.CombatExtended</packageId>
+      <displayName>Combat Extended</displayName>
+    </li>
+    <li>
+      <packageId>VanillaExpanded.VAPPE</packageId>
+      <displayName>Vanilla Apparel Expanded</displayName>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>Mewn.RU.VanillaExpanded.VExplorationE</li>
+    <li>OW.RU.Gravship1</li>
+    <li>VanillaExpanded.VWEC</li>
+    <li>CETeam.CombatExtended</li>
+    <li>VanillaExpanded.VAPPE</li>
+    <li>alik.quartermaster.russian.ce</li>
+  </loadAfter>
+  <description>Version 2. Runtime repair for Russian world-feature and orbital-location grammar after language injection, plus the Gauss multi-verb and VAE riot-shield compatibility fixes for the user's RimWorld 1.6 stack.</description>
+</ModMetaData>
